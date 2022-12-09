@@ -4,6 +4,7 @@ import gzip
 import h5py
 import atexit
 import cooler
+import shutil
 import hilbert
 import tempfile
 import subprocess
@@ -18,11 +19,28 @@ CURVE_ORDER_MAX = sys.maxsize
 CURVE_ORDER_MAX_FOR_PLACEHOLDER_DATA = 10
 
 class HilbertGenome:
-    def __init__(self, assembly="hg38", pseudo_chromosome_name="hilbert", signal_fn=None):
+    def __init__(self, 
+                 assembly="hg38", 
+                 pseudo_chromosome_name="hilbert", 
+                 signal_fn=None, 
+                 output_mcool_fn=None,
+                 signal_resolution=1,
+                ):
         self.assembly = assembly
         self.signal_fn = signal_fn
+        if not self.signal_fn:
+            sys.stderr.write("Note: Writing placeholder data; specify `signal_fn` argument for real data\n")
+        
+        self.output_mcool_fn = output_mcool_fn
+        self.output_mcool_dir = os.path.split(os.path.abspath(self.output_mcool_fn))[0]
+        if not self.output_mcool_fn:
+            raise ValueError("Error: Must specify valid output mcool path")
+        if not os.path.isdir(self.output_mcool_dir):
+            raise ValueError("Error: Must specify valid output mcool parent directory: {}".format(self.output_mcool_dir))
+
         self.__chromsizes = chromsizes
         self.__temp_dir = tempfile.TemporaryDirectory()
+        self.__signal_resolution = int(signal_resolution)
         
         #
         # set up curve order range and processing order
@@ -55,6 +73,7 @@ class HilbertGenome:
         #
         if not self.signal_fn:
             for co in self.curve_orders:
+                sys.stderr.write('Note: Processing signal for curve order {}...\n'.format(co))
                 self.__generate_bg2_from_placeholder_data_for_curve_order(co)
                 self.__convert_bg2_to_cooler_for_curve_order(co)
         else:
@@ -63,13 +82,18 @@ class HilbertGenome:
         #
         # generate mcool file
         #
-        self.__mcool_fn = self.__mcool_file_from_cooler_files()
+        self.__tmp_mcool_fn = self.__mcool_file_from_cooler_files()
         
         #
         # validate mcool
         #
-        if not cooler.fileops.is_multires_file(self.__mcool_fn):
-            raise ValueError("Multires file is not really mcool-formatted: {}".format(self.__mcool_fn))
+        if not cooler.fileops.is_multires_file(self.__tmp_mcool_fn):
+            raise ValueError("Error: Multires file is not really mcool-formatted: {}".format(self.__tmp_mcool_fn))
+        
+        #
+        # write temporary mcool to file
+        #
+        shutil.copy2(self.__tmp_mcool_fn, self.output_mcool_fn)
         
         #
         # clean up temporary directory upon exiting Python
@@ -97,10 +121,11 @@ class HilbertGenome:
     #
     
     def __cleanup(self):
-        sys.stderr.write('Deleting temporary directory...\n')
+        sys.stderr.write('Note: Deleting temporary directory...\n')
         self.__temp_dir.cleanup()
         
     def __mcool_file_from_cooler_files(self):
+        sys.stderr.write('Note: Creating mcool from cooler files...\n')
         output_mcool_fn = os.path.join(self.__temp_dir.name, 'bg2.signal.mcool')
         with h5py.File(output_mcool_fn, 'w') as output_mcool_h5:
             output_mcool_h5.attrs['format'] = 'HDF5::MCOOL'
@@ -111,23 +136,23 @@ class HilbertGenome:
             src_uri = os.path.join(self.__temp_dir.name, 'bg2.signal.{}.cool'.format(co))
             dst_uri = '{}::resolutions/{:d}'.format(output_mcool_fn, bin_size)
             if not cooler.fileops.is_cooler(src_uri):
-                raise ValueError("Per-resolution BG2 file is not formatted as a cooler: {}".format(src_uri))
+                raise ValueError("Error: Per-resolution BG2 file is not formatted as a cooler: {}".format(src_uri))
             cooler.fileops.cp(src_uri, dst_uri, overwrite=False)
         return output_mcool_fn
     
     def __cooler_object_for_curve_order(self, co):
         if co < self.curve_order.min or co > self.curve_order.max:
-            raise ValueError("Curve order outside bounds: {}".format(co))
+            raise ValueError("Error: Curve order outside bounds: {}".format(co))
         cooler_fn = os.path.join(self.__temp_dir.name, 'bg2.signal.{}.cool'.format(co))
         if not os.path.exists(cooler_fn):
-            raise FileNotFoundError("Missing Cooler file data at {}".format(cooler_fn))
+            raise FileNotFoundError("Error: Missing Cooler file data at {}".format(cooler_fn))
         cooler_obj = cooler.Cooler(cooler_fn)
         return cooler_obj
     
     def __convert_bg2_to_cooler_for_curve_order(self, co):
         input_signal_fn = os.path.join(self.__temp_dir.name, 'bg2.signal.{}.txt.gz'.format(co))
         if not os.path.exists(input_signal_fn):
-            raise FileNotFoundError("Missing BG2 pair data")
+            raise FileNotFoundError("Error: Missing BG2 pair data")
         output_cool_fn =  os.path.join(self.__temp_dir.name, 'bg2.signal.{}.cool'.format(co))
         bin_size = self.__bin_size_for_curve_order(co)
         cooler_load_cmd = 'cooler load -f bg2 --no-symmetric-upper {}:{:d} {} {}'.format(self.__chromsizes_fn, bin_size, input_signal_fn, output_cool_fn)
@@ -176,7 +201,7 @@ class HilbertGenome:
     
     def __calculate_curve_order_max(self):
         current_curve_order = CURVE_ORDER_MIN
-        size_threshold = self.__assembly_total_size()
+        size_threshold = self.__assembly_total_size() // self.__signal_resolution
         assert(4**current_curve_order < size_threshold)
         if not self.signal_fn:
             current_curve_order = CURVE_ORDER_MAX_FOR_PLACEHOLDER_DATA

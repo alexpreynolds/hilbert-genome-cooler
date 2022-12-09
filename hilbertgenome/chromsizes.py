@@ -60,10 +60,10 @@ class Chromsizes:
         #
         # set attributes
         #
-        chromsizes.assemblies = chromsizes['assemblies']
+        self.chromsizes.assemblies = chromsizes['assemblies']
         for assembly in _MD['root']['assemblies']:
-            setattr(chromsizes, assembly, chromsizes[assembly])
-            assembly_attr = getattr(chromsizes, assembly)
+            setattr(self.chromsizes, assembly, chromsizes[assembly])
+            assembly_attr = getattr(self.chromsizes, assembly)
             setattr(assembly_attr, 'chromosomes', chromsizes[assembly]['chromosomes'])
             setattr(assembly_attr, 'sizes', chromsizes[assembly]['sizes'])
             setattr(assembly_attr, 'total_size', chromsizes[assembly]['total_size'])
