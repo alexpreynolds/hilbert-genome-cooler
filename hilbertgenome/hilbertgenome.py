@@ -26,10 +26,10 @@ class HilbertGenome:
                  pseudo_chromosome_name="hilbert", 
                  input_signal_fn=None,
                  input_signal_categories=None,
-                 output_mcool_fn=None,
-                 base_signal_resolution=1,
+                 input_signal_resolution=1,
                  curve_order_min=None,
                  curve_order_max=None,
+                 output_mcool_fn=None,
                 ):
         self.assembly = assembly
         self.input_signal_fn = input_signal_fn
@@ -48,9 +48,9 @@ class HilbertGenome:
 
         self.__chromsizes = chromsizes
         self.__temp_dir = tempfile.TemporaryDirectory()
-        self.__base_signal_resolution = int(base_signal_resolution)
-        if self.__base_signal_resolution < SIGNAL_RESOLUTION_MIN:
-            raise ValueError("Error: Must specify positive, non-zero base signal resolution: {}".format(self.__base_signal_resolution))
+        self.__input_signal_resolution = int(input_signal_resolution)
+        if self.__input_signal_resolution < SIGNAL_RESOLUTION_MIN:
+            raise ValueError("Error: Must specify positive, non-zero base signal resolution: {}".format(self.__input_signal_resolution))
         
         #
         # set up curve order range and processing order
@@ -213,7 +213,7 @@ class HilbertGenome:
     
     def __calculate_curve_order_max(self):
         current_curve_order = CURVE_ORDER_MIN_OVERRIDE
-        size_threshold = self.__assembly_total_size() // self.__base_signal_resolution
+        size_threshold = self.__assembly_total_size() // self.__input_signal_resolution
         assert(4**current_curve_order < size_threshold)
         if self.__placeholder_data:
             current_curve_order = CURVE_ORDER_MAX_OVERRIDE_FOR_PLACEHOLDER_DATA
@@ -227,16 +227,17 @@ class HilbertGenome:
     
     def __calculate_curve_order_resolutions(self, co_min, co_max):
         co_current = co_min
-        size_threshold = self.__assembly_total_size() // self.__base_signal_resolution
-        print(size_threshold)
+        size_threshold = self.__assembly_total_size() // self.__input_signal_resolution
+        # print(size_threshold)
         while True:
             curve_cells = 4**co_current
             if curve_cells >= size_threshold or curve_cells == CURVE_ORDER_MAX_OVERRIDE:
                 break
             co_current += 1
         resolutions = []
-        res_current = self.__base_signal_resolution
-        print(co_current)
+        res_current = self.__input_signal_resolution
+        if co_current > co_max:
+            sys.stderr.write('Note: Custom curve order maximum ({}) is less than optimum calculated maximum ({})\n'.format(co_max, co_current))
         for co in range(co_current, co_min, -1):
             if co <= co_max:
                 resolutions.append({ co: res_current })
