@@ -2,6 +2,7 @@ import os
 import sys
 import gzip
 import h5py
+import json
 import atexit
 import cooler
 import shutil
@@ -16,23 +17,27 @@ from .chromsizes import *
 
 CURVE_ORDER_MIN_OVERRIDE = 4
 CURVE_ORDER_MAX_OVERRIDE = sys.maxsize
-CURVE_ORDER_MAX_OVERRIDE_FOR_PLACEHOLDER_DATA = 10
+CURVE_ORDER_MAX_OVERRIDE_FOR_PLACEHOLDER_DATA = 8
 SIGNAL_RESOLUTION_MIN = 1
 
 class HilbertGenome:
     def __init__(self, 
                  assembly="hg38", 
                  pseudo_chromosome_name="hilbert", 
-                 signal_fn=None, 
+                 input_signal_fn=None,
+                 input_signal_categories=None,
                  output_mcool_fn=None,
-                 signal_resolution=1,
+                 base_signal_resolution=1,
                  curve_order_min=None,
                  curve_order_max=None,
                 ):
         self.assembly = assembly
-        self.signal_fn = signal_fn
-        if not self.signal_fn:
-            sys.stderr.write("Note: Writing placeholder data; specify `signal_fn` argument for real data\n")
+        self.input_signal_fn = input_signal_fn
+        self.__input_signal_categories = input_signal_categories
+        self.__placeholder_data = False
+        if not self.input_signal_fn:
+            sys.stderr.write("Note: Writing placeholder data; specify `input_signal_fn` argument for real data\n")
+            self.__placeholder_data = True
         
         self.output_mcool_fn = output_mcool_fn
         self.output_mcool_dir = os.path.split(os.path.abspath(self.output_mcool_fn))[0]
@@ -43,9 +48,9 @@ class HilbertGenome:
 
         self.__chromsizes = chromsizes
         self.__temp_dir = tempfile.TemporaryDirectory()
-        self.__signal_resolution = int(signal_resolution)
-        if self.__signal_resolution < SIGNAL_RESOLUTION_MIN:
-            raise ValueError("Error: Must specify positive, non-zero signal resolution: {}".format(self.__signal_resolution))
+        self.__base_signal_resolution = int(base_signal_resolution)
+        if self.__base_signal_resolution < SIGNAL_RESOLUTION_MIN:
+            raise ValueError("Error: Must specify positive, non-zero base signal resolution: {}".format(self.__base_signal_resolution))
         
         #
         # set up curve order range and processing order
@@ -62,32 +67,29 @@ class HilbertGenome:
         self.pseudo_chromosome_name = pseudo_chromosome_name
         self.bin_resolution = 2**self.curve_order.max * len(self.curve_orders)
         self.__chromsizes_fn = self.__generate_chromsizes_file()
+        self.__signal_resolutions = self.__calculate_curve_order_resolutions(self.curve_order.min, self.curve_order.max)
+        print(self.__signal_resolutions)
         
         #
-        # signal - read real data from file or generate placeholder data
+        # signal - process real data from file or generate placeholder data
         #
         self.signal = UserDict({})
         
-        if not self.signal_fn:
+        if self.__placeholder_data:
             self.signal_range = UserDict({ 'min': 0, 'max': 2**self.curve_order.max })
-            setattr(self.signal_range, 'min', self.signal_range['min'])
-            setattr(self.signal_range, 'max', self.signal_range['max'])
-            for co in self.curve_orders:
-                self.__generate_placeholder_data_for_curve_order(co)
-                
-        else:
-            pass # need code to read in gzip file and extract signal
-        
-        #
-        # signal - process
-        #
-        if not self.signal_fn:
             for co in self.curve_orders:
                 sys.stderr.write('Note: Processing signal for curve order {}...\n'.format(co))
+                self.__generate_placeholder_data_for_curve_order(co)
                 self.__generate_bg2_from_placeholder_data_for_curve_order(co)
                 self.__convert_bg2_to_cooler_for_curve_order(co)
+                
         else:
-            pass # need code for processing real data per Observablehq algorithm
+            self.signal_range = UserDict({ 'min': 0, 'max': self.__input_signal_categories - 1 })
+            self.__prepare_real_data()
+            for co in self.curve_orders:
+                sys.stderr.write('Note: Processing signal for curve order {}...\n'.format(co))
+                self.__generate_real_data_for_curve_order(co)
+            sys.exit(0)
         
         #
         # generate mcool file
@@ -160,12 +162,12 @@ class HilbertGenome:
         return cooler_obj
     
     def __convert_bg2_to_cooler_for_curve_order(self, co):
-        input_signal_fn = os.path.join(self.__temp_dir.name, 'bg2.signal.{}.txt.gz'.format(co))
-        if not os.path.exists(input_signal_fn):
+        input_bg2_fn = os.path.join(self.__temp_dir.name, 'bg2.signal.{}.txt.gz'.format(co))
+        if not os.path.exists(input_bg2_fn):
             raise FileNotFoundError("Error: Missing BG2 pair data")
         output_cool_fn =  os.path.join(self.__temp_dir.name, 'bg2.signal.{}.cool'.format(co))
         bin_size = self.__bin_size_for_curve_order(co)
-        cooler_load_cmd = 'cooler load -f bg2 --no-symmetric-upper {}:{:d} {} {}'.format(self.__chromsizes_fn, bin_size, input_signal_fn, output_cool_fn)
+        cooler_load_cmd = 'cooler load -f bg2 --no-symmetric-upper {}:{:d} {} {}'.format(self.__chromsizes_fn, bin_size, input_bg2_fn, output_cool_fn)
         try:
             subprocess.run(cooler_load_cmd, shell=True, check=True, stderr=subprocess.DEVNULL)
         except subprocess.CalledProcessError as err:
@@ -175,8 +177,8 @@ class HilbertGenome:
         return self.bin_resolution // 2**co
     
     def __generate_bg2_from_placeholder_data_for_curve_order(self, co):
-        output_signal_fn = os.path.join(self.__temp_dir.name, 'bg2.signal.{}.txt.gz'.format(co))
-        with gzip.open(output_signal_fn, 'wb') as ofh:
+        output_bg2_fn = os.path.join(self.__temp_dir.name, 'bg2.signal.{}.txt.gz'.format(co))
+        with gzip.open(output_bg2_fn, 'wb') as ofh:
             signal_items = 4**co
             hilbert_locs = hilbert.decode(np.arange(signal_items), 2, co)
             reordered_idxs = np.lexsort((hilbert_locs[:,1], hilbert_locs[:,0]))
@@ -211,17 +213,35 @@ class HilbertGenome:
     
     def __calculate_curve_order_max(self):
         current_curve_order = CURVE_ORDER_MIN_OVERRIDE
-        size_threshold = self.__assembly_total_size() // self.__signal_resolution
+        size_threshold = self.__assembly_total_size() // self.__base_signal_resolution
         assert(4**current_curve_order < size_threshold)
-        if not self.signal_fn:
+        if self.__placeholder_data:
             current_curve_order = CURVE_ORDER_MAX_OVERRIDE_FOR_PLACEHOLDER_DATA
         else:
             while True:
                 hilbert_curve_cells = 4**current_curve_order
-                if hilbert_curve_cells >= size_threshold or hilbert_curve_cells == CURVE_ORDER_MAX:
+                if hilbert_curve_cells >= size_threshold or hilbert_curve_cells == CURVE_ORDER_MAX_OVERRIDE:
                     break
                 current_curve_order += 1
         return current_curve_order
+    
+    def __calculate_curve_order_resolutions(self, co_min, co_max):
+        co_current = co_min
+        size_threshold = self.__assembly_total_size() // self.__base_signal_resolution
+        print(size_threshold)
+        while True:
+            curve_cells = 4**co_current
+            if curve_cells >= size_threshold or curve_cells == CURVE_ORDER_MAX_OVERRIDE:
+                break
+            co_current += 1
+        resolutions = []
+        res_current = self.__base_signal_resolution
+        print(co_current)
+        for co in range(co_current, co_min, -1):
+            if co <= co_max:
+                resolutions.append({ co: res_current })
+            res_current *= 2
+        return resolutions
     
     def __generate_chromsizes_file(self):
         chromsizes_fn = os.path.join(self.__temp_dir.name, 'chromsizes.txt')
@@ -233,3 +253,88 @@ class HilbertGenome:
     
     def __assembly_total_size(self):
         return self.__chromsizes[self.assembly].total_size
+    
+    def __is_gz_file(self, ifn):
+        with open(ifn, 'rb') as ifh:
+            return ifh.read(2) == b'\x1f\x8b'
+    
+    def __calculate_background_frequencies(self, ifn, categories):
+        if not categories:
+            raise ValueError('Error: Please specify `input_signal_categories` when reading in `input_signal_fn`')
+        idxs = 0
+        idxs_max_signal = [0]*categories
+        with gzip.open(ifn, 'rb') as ifh:
+            for line in ifh:
+                elems = line.decode().rstrip().split('\t')
+                signal = np.array([float(x) for x in elems[3:]])
+                idxs_max_signal[np.argmax(signal)] += 1
+                idxs += 1
+        return [float(x)/idxs for x in idxs_max_signal]
+    
+    def __generate_background_frequencies_file(self, ofn, frequencies):
+        with open(ofn, 'w') as ofh:
+            freqs_json = json.dumps(frequencies, indent=2)
+            ofh.write(freqs_json)
+            
+    def __generate_categorical_data(self, ifn):
+        signals = {}
+        with gzip.open(ifn, 'rb') as ifh:
+            for line in ifh:
+                elems = line.decode().rstrip().split('\t')
+                chromosome = elems[0]
+                signal = np.array([float(x) for x in elems[3:]])
+                if chromosome not in signals:
+                    signals[chromosome] = []
+                signals[chromosome].append(np.argmax(signal))
+        return signals
+
+    def __generate_categorical_data_file(self, ofn, categorical_data):
+        with gzip.open(ofn, 'wb') as ofh:
+            categorical_data_json = json.dumps(categorical_data, cls=NumpyEncoder)
+            ofh.write(categorical_data_json.encode())
+            
+    def __prepare_real_data(self):
+        if not self.__is_gz_file(self.input_signal_fn):
+            raise ValueError("Error: Input signal file is not gzipped")
+        self.__input_signal_dir = os.path.split(os.path.abspath(self.input_signal_fn))[0]
+        #
+        # background frequencies
+        #
+        self.__background_frequencies_fn = os.path.join(self.__input_signal_dir, '{}.background_frequencies.json'.format(os.path.basename(self.input_signal_fn)))
+        if not os.path.exists(self.__background_frequencies_fn):
+            sys.stderr.write('Note: Calculating background frequencies of categories from input signal file\n')
+            self.__background_frequencies = self.__calculate_background_frequencies(self.input_signal_fn, self.__input_signal_categories)
+            self.__generate_background_frequencies_file(self.__background_frequencies_fn, self.__background_frequencies)
+        else:
+            with open(self.__background_frequencies_fn, 'r') as ifh:
+                self.__background_frequencies = json.load(ifh)
+
+        #
+        # categorical data
+        #
+        self.__categorical_data_fn = os.path.join(self.__input_signal_dir, '{}.categorical_data.json.gz'.format(os.path.basename(self.input_signal_fn)))
+        if not os.path.exists(self.__categorical_data_fn):
+            sys.stderr.write('Note: Generating categorical data from input signal file\n')
+            self.__categorical_data = self.__generate_categorical_data(self.input_signal_fn)
+            self.__generate_categorical_data_file(self.__categorical_data_fn, self.__categorical_data)
+        else:
+            with gzip.open(self.__categorical_data_fn, 'rb') as ifh:
+                self.__categorical_data = json.load(ifh)
+
+        print(self.__background_frequencies)
+        print(self.__categorical_data['chr2'][1000:1010])
+
+    def __generate_real_data_for_curve_order(self, co):
+        pass
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, np.bool_):
+            return bool(obj)
+        return super(NumpyEncoder, self).default(obj)
