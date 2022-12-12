@@ -14,9 +14,10 @@ from collections import UserDict
 
 from .chromsizes import *
 
-CURVE_ORDER_MIN = 4
-CURVE_ORDER_MAX = sys.maxsize
-CURVE_ORDER_MAX_FOR_PLACEHOLDER_DATA = 10
+CURVE_ORDER_MIN_OVERRIDE = 4
+CURVE_ORDER_MAX_OVERRIDE = sys.maxsize
+CURVE_ORDER_MAX_OVERRIDE_FOR_PLACEHOLDER_DATA = 10
+SIGNAL_RESOLUTION_MIN = 1
 
 class HilbertGenome:
     def __init__(self, 
@@ -25,6 +26,8 @@ class HilbertGenome:
                  signal_fn=None, 
                  output_mcool_fn=None,
                  signal_resolution=1,
+                 curve_order_min=None,
+                 curve_order_max=None,
                 ):
         self.assembly = assembly
         self.signal_fn = signal_fn
@@ -41,13 +44,20 @@ class HilbertGenome:
         self.__chromsizes = chromsizes
         self.__temp_dir = tempfile.TemporaryDirectory()
         self.__signal_resolution = int(signal_resolution)
+        if self.__signal_resolution < SIGNAL_RESOLUTION_MIN:
+            raise ValueError("Error: Must specify positive, non-zero signal resolution: {}".format(self.__signal_resolution))
         
         #
         # set up curve order range and processing order
         #
-        self.curve_order = UserDict({ 'min': CURVE_ORDER_MIN, 'max': self.__calculate_curve_order_max() })
+        if not curve_order_min or not curve_order_max:
+            self.curve_order = UserDict({ 'min': CURVE_ORDER_MIN_OVERRIDE, 'max': self.__calculate_curve_order_max() })
+        else:
+            self.curve_order = UserDict({ 'min': curve_order_min, 'max': curve_order_max })
         setattr(self.curve_order, 'min', self.curve_order['min'])
         setattr(self.curve_order, 'max', self.curve_order['max'])
+        assert(self.curve_order.min >= 4)
+        assert(self.curve_order.max < sys.maxsize)
         self.curve_orders = list(reversed(range(self.curve_order.min, self.curve_order.max + 1)))
         self.pseudo_chromosome_name = pseudo_chromosome_name
         self.bin_resolution = 2**self.curve_order.max * len(self.curve_orders)
@@ -200,11 +210,11 @@ class HilbertGenome:
                                       axis=0)
     
     def __calculate_curve_order_max(self):
-        current_curve_order = CURVE_ORDER_MIN
+        current_curve_order = CURVE_ORDER_MIN_OVERRIDE
         size_threshold = self.__assembly_total_size() // self.__signal_resolution
         assert(4**current_curve_order < size_threshold)
         if not self.signal_fn:
-            current_curve_order = CURVE_ORDER_MAX_FOR_PLACEHOLDER_DATA
+            current_curve_order = CURVE_ORDER_MAX_OVERRIDE_FOR_PLACEHOLDER_DATA
         else:
             while True:
                 hilbert_curve_cells = 4**current_curve_order
