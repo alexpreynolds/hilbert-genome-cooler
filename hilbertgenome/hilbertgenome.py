@@ -5,6 +5,7 @@ import h5py
 import json
 import atexit
 import cooler
+import random
 import shutil
 import hilbert
 import tempfile
@@ -25,15 +26,18 @@ class HilbertGenome:
                  assembly="hg38", 
                  pseudo_chromosome_name="hilbert", 
                  input_signal_fn=None,
-                 input_signal_categories=None,
+                 input_signal_categories=18,
                  input_signal_resolution=1,
                  curve_order_min=None,
                  curve_order_max=None,
+                 chromosomes_to_exclude=["chrY"],
                  output_mcool_fn=None,
                 ):
         self.assembly = assembly
         self.input_signal_fn = input_signal_fn
-        self.__input_signal_categories = input_signal_categories
+        self.__input_signal_categories = int(input_signal_categories)
+        self.__input_signal_NA_category_value = self.__input_signal_categories - 1
+        self.__chromosomes_to_exclude = chromosomes_to_exclude
         self.__placeholder_data = False
         if not self.input_signal_fn:
             sys.stderr.write("Note: Writing placeholder data; specify `input_signal_fn` argument for real data\n")
@@ -47,6 +51,7 @@ class HilbertGenome:
             raise ValueError("Error: Must specify valid output mcool parent directory: {}".format(self.output_mcool_dir))
 
         self.__chromsizes = chromsizes
+        self.__genome = self.__chromsizes[self.assembly]
         self.__temp_dir = tempfile.TemporaryDirectory()
         self.__input_signal_resolution = int(input_signal_resolution)
         if self.__input_signal_resolution < SIGNAL_RESOLUTION_MIN:
@@ -77,6 +82,8 @@ class HilbertGenome:
         
         if self.__placeholder_data:
             self.signal_range = UserDict({ 'min': 0, 'max': 2**self.curve_order.max })
+            setattr(self.signal_range, 'min', self.signal_range['min'])
+            setattr(self.signal_range, 'max', self.signal_range['max'])
             for co in self.curve_orders:
                 sys.stderr.write('Note: Processing signal for curve order {}...\n'.format(co))
                 self.__generate_placeholder_data_for_curve_order(co)
@@ -85,6 +92,8 @@ class HilbertGenome:
                 
         else:
             self.signal_range = UserDict({ 'min': 0, 'max': self.__input_signal_categories - 1 })
+            setattr(self.signal_range, 'min', self.signal_range['min'])
+            setattr(self.signal_range, 'max', self.signal_range['max'])
             self.__prepare_real_data()
             for co in self.curve_orders:
                 sys.stderr.write('Note: Processing signal for curve order {}...\n'.format(co))
@@ -138,7 +147,7 @@ class HilbertGenome:
         
     def __mcool_file_from_cooler_files(self):
         sys.stderr.write('Note: Creating mcool from cooler files...\n')
-        output_mcool_fn = os.path.join(self.__temp_dir.name, 'bg2.signal.mcool')
+        output_mcool_fn = os.path.join(self.__temp_dir.name, 'signal.mcool')
         with h5py.File(output_mcool_fn, 'w') as output_mcool_h5:
             output_mcool_h5.attrs['format'] = 'HDF5::MCOOL'
             output_mcool_h5.attrs['format-version'] = 2
@@ -155,17 +164,17 @@ class HilbertGenome:
     def __cooler_object_for_curve_order(self, co):
         if co < self.curve_order.min or co > self.curve_order.max:
             raise ValueError("Error: Curve order outside bounds: {}".format(co))
-        cooler_fn = os.path.join(self.__temp_dir.name, 'bg2.signal.{}.cool'.format(co))
+        cooler_fn = os.path.join(self.__temp_dir.name, 'signal.{}.cool'.format(co))
         if not os.path.exists(cooler_fn):
             raise FileNotFoundError("Error: Missing Cooler file data at {}".format(cooler_fn))
         cooler_obj = cooler.Cooler(cooler_fn)
         return cooler_obj
     
     def __convert_bg2_to_cooler_for_curve_order(self, co):
-        input_bg2_fn = os.path.join(self.__temp_dir.name, 'bg2.signal.{}.txt.gz'.format(co))
+        input_bg2_fn = os.path.join(self.__temp_dir.name, 'signal.{}.txt.gz'.format(co))
         if not os.path.exists(input_bg2_fn):
             raise FileNotFoundError("Error: Missing BG2 pair data")
-        output_cool_fn =  os.path.join(self.__temp_dir.name, 'bg2.signal.{}.cool'.format(co))
+        output_cool_fn =  os.path.join(self.__temp_dir.name, 'signal.{}.cool'.format(co))
         bin_size = self.__bin_size_for_curve_order(co)
         cooler_load_cmd = 'cooler load -f bg2 --no-symmetric-upper {}:{:d} {} {}'.format(self.__chromsizes_fn, bin_size, input_bg2_fn, output_cool_fn)
         try:
@@ -177,7 +186,7 @@ class HilbertGenome:
         return self.bin_resolution // 2**co
     
     def __generate_bg2_from_placeholder_data_for_curve_order(self, co):
-        output_bg2_fn = os.path.join(self.__temp_dir.name, 'bg2.signal.{}.txt.gz'.format(co))
+        output_bg2_fn = os.path.join(self.__temp_dir.name, 'signal.{}.txt.gz'.format(co))
         with gzip.open(output_bg2_fn, 'wb') as ofh:
             signal_items = 4**co
             hilbert_locs = hilbert.decode(np.arange(signal_items), 2, co)
@@ -234,13 +243,13 @@ class HilbertGenome:
             if curve_cells >= size_threshold or curve_cells == CURVE_ORDER_MAX_OVERRIDE:
                 break
             co_current += 1
-        resolutions = []
+        resolutions = {}
         res_current = self.__input_signal_resolution
         if co_current > co_max:
             sys.stderr.write('Note: Custom curve order maximum ({}) is less than optimum calculated maximum ({})\n'.format(co_max, co_current))
-        for co in range(co_current, co_min, -1):
+        for co in range(co_current, co_min - 1, -1):
             if co <= co_max:
-                resolutions.append({ co: res_current })
+                resolutions[co] = res_current
             res_current *= 2
         return resolutions
     
@@ -253,7 +262,7 @@ class HilbertGenome:
         return chromsizes_fn
     
     def __assembly_total_size(self):
-        return self.__chromsizes[self.assembly].total_size
+        return self.__genome.total_size
     
     def __is_gz_file(self, ifn):
         with open(ifn, 'rb') as ifh:
@@ -286,7 +295,10 @@ class HilbertGenome:
                 signal = np.array([float(x) for x in elems[3:]])
                 if chromosome not in signals:
                     signals[chromosome] = []
-                signals[chromosome].append(np.argmax(signal))
+                if chromosome not in self.__chromosomes_to_exclude:
+                    signals[chromosome].append(np.argmax(signal))
+                else:
+                    signals[chromosome].append(self.__input_signal_NA_category_value)
         return signals
 
     def __generate_categorical_data_file(self, ofn, categorical_data):
@@ -309,6 +321,10 @@ class HilbertGenome:
         else:
             with open(self.__background_frequencies_fn, 'r') as ifh:
                 self.__background_frequencies = json.load(ifh)
+                
+        self.__background_frequencies_with_noise = [x + random.uniform(0, 1e-8) for x in self.__background_frequencies]
+        self.__background_frequencies_with_noise_reverse_lookup = dict(zip(self.__background_frequencies_with_noise, range(self.signal_range.min, self.signal_range.max + 1)))
+        print(self.__background_frequencies_with_noise_reverse_lookup)
 
         #
         # categorical data
@@ -326,7 +342,35 @@ class HilbertGenome:
         print(self.__categorical_data['chr2'][1000:1010])
 
     def __generate_real_data_for_curve_order(self, co):
-        pass
+        signal_resolution_for_co = self.__signal_resolutions[co]
+        if co == self.curve_order.max:
+            #
+            # initial pass
+            #
+            signal_resolution_split_width = signal_resolution_for_co // self.__input_signal_resolution
+            convert_to_background_frequency = lambda a : self.__background_frequencies_with_noise[a]
+            find_minimum_background_frequency = lambda a : a[np.argmin(a)]
+            for chromosome in self.__genome.chromosomes:
+                try:
+                    data = self.__categorical_data[chromosome]
+                    data_split = [data[i * signal_resolution_split_width:(i + 1) * signal_resolution_split_width] for i in range((len(data) + signal_resolution_split_width - 1) // signal_resolution_split_width )] #np.array_split(data, len(data) // signal_resolution_split_width)
+                    data_split_to_promoted_categories = []
+                    for ds in data_split:
+                        ds_as_fs = np.array([convert_to_background_frequency(x) for x in ds])
+                        promoted_category = self.__background_frequencies_with_noise_reverse_lookup[np.min(ds_as_fs)]
+                        data_split_to_promoted_categories.append(promoted_category)
+                    #
+                    # write 'data_split_to_promoted_categories' to new categorical data lookup table by curve order
+                    #
+                    # aggregate it per Observable algorithm (see /net/seq/data/projects/Epilogos/hilbert-genome-test for possible approach)
+                    #
+                except KeyError:
+                    pass
+        else:
+            #
+            # subsequent passes reduce the 'data_split_to_promoted_categories' result
+            #
+            pass
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
