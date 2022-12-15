@@ -1,5 +1,6 @@
 import requests
 import tempfile
+from natsort import natsorted, ns
 from collections import UserDict
 
 '''
@@ -16,9 +17,10 @@ _MD = {
 }
 
 class Chromsizes:
-    def __init__(self, chromsizes=UserDict({'assemblies':[]}), filter_non_nuclear_chroms=True):
+    def __init__(self, chromsizes=UserDict({'assemblies':[]}), filter_non_nuclear_chroms=True, chromosome_blacklist=['chrM']):
         self.chromsizes = chromsizes
         self.filter_non_nuclear_chroms = filter_non_nuclear_chroms
+        self.chromosome_blacklist = chromosome_blacklist
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             for assembly in _MD['root']['assemblies']:
@@ -49,9 +51,18 @@ class Chromsizes:
                         #
                         if self.filter_non_nuclear_chroms and '_' in chromosome:
                             continue
+                        #
+                        # handle blacklisted chromosome names
+                        #
+                        if chromosome in self.chromosome_blacklist:
+                            continue
                         assembly_obj['chromosomes'].append(chromosome)
                         assembly_obj['sizes'][chromosome] = size
                         assembly_obj['total_size'] += size
+                    #
+                    # chromosome list has natural sort applied to it (e.g., "chr1, chr2, ..., chrY")
+                    #
+                    assembly_obj['chromosomes'] = natsorted(assembly_obj['chromosomes'], alg=ns.IGNORECASE)
                     self.chromsizes[assembly] = assembly_obj
                     self.chromsizes['assemblies'].append(assembly)
                 except requests.exceptions.RequestException as e:
