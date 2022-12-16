@@ -25,12 +25,13 @@ body {
   touch-action: none !important;
 }
 
-h4 {
-  margin: 0;
-  padding: 0;
-  padding-top: 10px;
-  padding-bottom: 10px;
-  font-size: 1.1em;
+.title {
+  font-weight: 500;
+}
+
+.subtitle {
+  padding-left: 10px;
+  font-style: italic;
   font-weight: 300;
 }
 
@@ -38,10 +39,12 @@ h4 {
   display: flex;
   flex-flow: column;
   height: 100%;
-  margin: 10px;
+  margin: 0px;
   margin-top: 0px;
-  padding: 10px;
+  padding: 20px;
   padding-top: 0px;
+  color: black;
+  background-color: rgb(242, 242, 242);
 }
 
 .box .row {}
@@ -53,13 +56,19 @@ h4 {
   flex-shrink: 1,
   flex-basis: auto
   */
+  margin: 0;
+  padding: 0;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  font-size: 1.1em;
 }
 
 .box .row.content {
   flex: 1 1 auto;
+  background-color: white;
   border: 1px dotted grey;
 }
 
 .box .row.footer {
-  flex: 0 1 20px; /* total margin and padding of h4 */
+  flex: 0 1 20px; /* total margin and padding of ".box .row.header" */
 }
