@@ -3,7 +3,7 @@ Exploring the Cooler format to store whole-genome datasets arranged into a Hilbe
 
 ## `hilbertgenome`
 
-A Python library to generate a multiscale `mcool` file of categorical data from an epilogos "scores" file.
+A Python library to generate a multiscale `mcool` file of categorical data derived from a whole-genome epilogos "scores"-formatted file.
 
 ## `HilbertGenomeCooler.ipynb`
 
