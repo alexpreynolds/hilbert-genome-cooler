@@ -66,7 +66,7 @@ body {
 .box .row.content {
   flex: 1 1 auto;
   background-color: white;
-  border: 1px dotted grey;
+  border: 1px solid black;
 }
 
 .box .row.footer {
