@@ -34,6 +34,7 @@ class HilbertGenome:
                  curve_order_max=None,
                  chromosomes_to_exclude=['chrY'],
                  output_mcool_fn=None,
+                 output_chromsizes_fn=None
                 ):
         self.assembly = assembly
         self.input_signal_fn = input_signal_fn
@@ -51,6 +52,13 @@ class HilbertGenome:
             raise ValueError('Error: Must specify valid output mcool path')
         if not os.path.isdir(self.output_mcool_dir):
             raise ValueError('Error: Must specify valid output mcool parent directory: {}'.format(self.output_mcool_dir))
+            
+        self.output_chromsizes_fn = output_chromsizes_fn
+        self.output_chromsizes_dir = os.path.split(os.path.abspath(self.output_chromsizes_fn))[0]
+        if not self.output_chromsizes_fn:
+            raise ValueError('Error: Must specify valid output chromsizes path')
+        if not os.path.isdir(self.output_chromsizes_dir):
+            raise ValueError('Error: Must specify valid output chromsizes parent directory: {}'.format(self.output_chromsizes_dir))
 
         self.__chromsizes = chromsizes
         self.__genome = self.__chromsizes[self.assembly]
@@ -116,9 +124,10 @@ class HilbertGenome:
             raise ValueError('Error: Multires file is not really mcool-formatted: {}'.format(self.__tmp_mcool_fn))
         
         #
-        # write temporary mcool to file
+        # write temporary mcool and chromsizes to file
         #
         shutil.copy2(self.__tmp_mcool_fn, self.output_mcool_fn)
+        shutil.copy2(self.__chromsizes_fn, self.output_chromsizes_fn)
         
         #
         # clean up temporary directory upon exiting Python
@@ -150,6 +159,7 @@ class HilbertGenome:
         fig = plt.figure(figsize=(12, 12))
         ax = fig.add_subplot(111)
         im = ax.matshow(cooler_arr, cmap=cmap, interpolation='nearest', vmin=self.signal_range.min, vmax=self.signal_range.max)
+        plt.title('Curve order {}'.format(co))
         return fig.colorbar(im)
     
     #
