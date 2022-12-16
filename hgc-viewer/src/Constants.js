@@ -37,12 +37,12 @@ export const demoHgViewconf = {
         {
         "uid": "aa",
         "initialXDomain": [
-            -18432,
-            55296
+            -73728,
+            110592
         ],
         "initialYDomain": [
-            -18432,
-            55296
+            -73728,
+            110592
         ],
         "tracks": {
             "top": [
