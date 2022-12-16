@@ -14,16 +14,16 @@ class App extends Component {
 
     this.state = {
       hgViewKey: 0,
-      demoHgViewOptions: Constants.demoHgViewOptions,
-      demoHgViewconf: Constants.demoHgViewconf,
-      demoDatasetMd: Constants.demoDatasetMd,
+      hgViewOptions: Constants.demoHgViewOptions,
+      hgViewconf: Constants.demoHgViewconf,
+      datasetMd: Constants.demoDatasetMd,
     };
 
     this.hgView = React.createRef();
   }
 
   componentDidMount() {}
-  
+
   componentWillUnmount() {}
 
   render() {
@@ -31,14 +31,14 @@ class App extends Component {
       <div className="box">
         <div className="row header">
           <div>
-            <span className="title">hilbert-genome-cooler demo viewer</span> <span className="subtitle">{this.state.demoDatasetMd.filename}</span>
+            <span className="title">hilbert-genome-cooler demo viewer</span> <span className="subtitle">{this.state.datasetMd.name}</span>
           </div>
         </div>
         <div className="row content">
           <HiGlassComponent
             ref={(component) => this.hgView = component}
-            options={this.state.demoHgViewOptions}
-            viewConfig={this.state.demoHgViewconf}
+            options={this.state.hgViewOptions}
+            viewConfig={this.state.hgViewconf}
             />
         </div>
         <div className="row footer" />
