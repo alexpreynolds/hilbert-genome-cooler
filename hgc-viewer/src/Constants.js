@@ -19,9 +19,9 @@ export const demoDatasetMd = {
 };
 
 /**
-# python /home/higlass/projects/higlass-server/manage.py list_tilesets | grep hilbert12
-tileset: Tileset [name: hilbert12.chromsizes.txt] [ft: chromsizes-tsv] [uuid: M1Y7dlXKRVOkqWoTW_Sr8g]
-tileset: Tileset [name: hilbert12.signal.mcool] [ft: cooler] [uuid: G-R_nM-zRjCNTEdh8iUfkw]
+# python /home/higlass/projects/higlass-server/manage.py list_tilesets | grep hilbert11
+tileset: Tileset [name: hilbert11.chromsizes.txt] [ft: chromsizes-tsv] [uuid: OiAkxtbaQdO-MdHRkjoc5Q]
+tileset: Tileset [name: hilbert11.signal.mcool] [ft: cooler] [uuid: Vq1IgO7_QzONgHolTDLh2Q]
 */
 
 export const demoHgViewconf = {
@@ -36,22 +36,22 @@ export const demoHgViewconf = {
         {
         "uid": "aa",
         "initialXDomain": [
-            -589824,
-            663552
+            -6124,
+            8192
         ],
         "initialYDomain": [
-            -73728,
-            110592
+            -6124,
+            8192
         ],
         "tracks": {
             "top": [
             {
-                "name": "hilbert12",
-                "server": "https://meuleman-higlass-us-west-2.altius.org/api/v1",
+                "name": "hilbert11",
+                "server": "http://meuleman-higlass-us-west-2.altius.org/api/v1",
                 "type": "horizontal-chromosome-labels",
                 "height": 0,
-                "tilesetUid": "M1Y7dlXKRVOkqWoTW_Sr8g",
-                "uid": "hilbert12chrom",
+                "tilesetUid": "OiAkxtbaQdO-MdHRkjoc5Q",
+                "uid": "hilbert11_chrom",
                 "options": {
                     "showMousePosition": false,
                     "mousePositionColor": "#999999"
@@ -61,12 +61,12 @@ export const demoHgViewconf = {
             ],
             "left": [
             {
-                "name": "hilbert12",
-                "server": "https://meuleman-higlass-us-west-2.altius.org/api/v1",
+                "name": "hilbert11",
+                "server": "http://meuleman-higlass-us-west-2.altius.org/api/v1",
                 "type": "horizontal-chromosome-labels",
                 "width": 0,
-                "tilesetUid": "M1Y7dlXKRVOkqWoTW_Sr8g",
-                "uid": "hilbert12chrom",
+                "tilesetUid": "OiAkxtbaQdO-MdHRkjoc5Q",
+                "uid": "hilbert11_chrom",
                 "options": {
                     "showMousePosition": false,
                     "mousePositionColor": "#999999"
@@ -81,8 +81,8 @@ export const demoHgViewconf = {
                 "height": 691,
                 "contents": [
                 {
-                    "server": "https://meuleman-higlass-us-west-2.altius.org/api/v1",
-                    "tilesetUid": "G-R_nM-zRjCNTEdh8iUfkw",
+                    "server": "http://meuleman-higlass-us-west-2.altius.org/api/v1",
+                    "tilesetUid": "Vq1IgO7_QzONgHolTDLh2Q",
                     "type": "heatmap",
                     "options": {
                         "colorRange": ['#ff0000', '#ff4500', '#ff4500', '#ff4500', '#008000', '#006400', '#c2e105', '#c2e105', '#ffc34d', '#ffc34d', '#ffff00', '#66cdaa', '#8a91d0', '#cd5c5c', '#bdb76b', '#808080', '#c0c0c0', '#ffffff'],
@@ -97,21 +97,21 @@ export const demoHgViewconf = {
                         "scaleStartPercent": "0.00000",
                         "scaleEndPercent": "1.00000",
                         "backgroundColor": "#000000",
-                        "zeroValueColor":  "#000000",
+                        // "zeroValueColor":  "#000000",
                         "showMousePosition": false,
                         "mousePositionColor": "#999999",
                         "showTooltip": true,
                     },
-                    "uid": "hilbert12heatmap",
+                    "uid": "hilbert11_heatmap",
                     "width": 479,
                     "height": 691
                 },
                 {
-                    "name": "hilbert12",
-                    "server": "https://meuleman-higlass-us-west-2.altius.org/api/v1",
+                    "name": "hilbert11",
+                    "server": "http://meuleman-higlass-us-west-2.altius.org/api/v1",
                     "type": "2d-chromosome-grid",
-                    "tilesetUid": "M1Y7dlXKRVOkqWoTW_Sr8g",
-                    "uid": "hilbert12chrom",
+                    "tilesetUid": "OiAkxtbaQdO-MdHRkjoc5Q",
+                    "uid": "hilbert11_chrom",
                     "options": {
                         "lineStrokeWidth": 1,
                         "lineStrokeColor": "grey"
@@ -128,12 +128,12 @@ export const demoHgViewconf = {
             ],
             "right": [
             {
-                "name": "hilbert12",
-                "server": "https://meuleman-higlass-us-west-2.altius.org/api/v1",
+                "name": "hilbert11",
+                "server": "http://meuleman-higlass-us-west-2.altius.org/api/v1",
                 "type": "horizontal-chromosome-labels",
                 "width": 0,
-                "tilesetUid": "M1Y7dlXKRVOkqWoTW_Sr8g",
-                "uid": "hilbert12chrom",
+                "tilesetUid": "OiAkxtbaQdO-MdHRkjoc5Q",
+                "uid": "hilbert11_chrom",
                 "options": {
                     "showMousePosition": false,
                     "mousePositionColor": "#999999"
