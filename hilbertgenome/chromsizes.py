@@ -65,6 +65,11 @@ class Chromsizes:
                     assembly_obj['chromosomes'] = natsorted(assembly_obj['chromosomes'], alg=ns.IGNORECASE)
                     self.chromsizes[assembly] = assembly_obj
                     self.chromsizes['assemblies'].append(assembly)
+                    self.chromsizes[assembly]['sizes']['__acc_ns'] = {}
+                    acc = 0
+                    for chromosome in assembly_obj['chromosomes']:
+                        self.chromsizes[assembly]['sizes']['__acc_ns'][chromosome] = acc
+                        acc += self.chromsizes[assembly]['sizes'][chromosome]
                 except requests.exceptions.RequestException as e:
                     raise SystemExit(e)
 
@@ -77,6 +82,7 @@ class Chromsizes:
             assembly_attr = getattr(self.chromsizes, assembly)
             setattr(assembly_attr, 'chromosomes', chromsizes[assembly]['chromosomes'])
             setattr(assembly_attr, 'sizes', chromsizes[assembly]['sizes'])
+            setattr(assembly_attr, 'sizes_acc', chromsizes[assembly]['sizes']['__acc_ns'])
             setattr(assembly_attr, 'total_size', chromsizes[assembly]['total_size'])
 
 _CS = Chromsizes(filter_non_nuclear_chroms=True)

@@ -13,7 +13,6 @@ export const demoHgViewOptions = {
     viewPaddingRight: 0 
 };
 
-
 export const demoDatasetMd = {
     filename: 'Boix_et_al_833_sample.hg19.18.All_833_biosamples.S1.scores.txt.gz',
     name: 'Boix_et_al_833_sample.hg19.18.All_833_biosamples.S1',
@@ -37,8 +36,8 @@ export const demoHgViewconf = {
         {
         "uid": "aa",
         "initialXDomain": [
-            -73728,
-            110592
+            -589824,
+            663552
         ],
         "initialYDomain": [
             -73728,
@@ -97,7 +96,8 @@ export const demoHgViewconf = {
                         "heatmapValueScaling": "linear",
                         "scaleStartPercent": "0.00000",
                         "scaleEndPercent": "1.00000",
-                        "backgroundColor": "#eeeeee",
+                        "backgroundColor": "#000000",
+                        "zeroValueColor":  "#000000",
                         "showMousePosition": false,
                         "mousePositionColor": "#999999",
                         "showTooltip": true,
@@ -154,13 +154,6 @@ export const demoHgViewconf = {
             "x": 0,
             "y": 0
         },
-        "genomePositionSearchBox": {
-            "autocompleteServer": "http://higlass.io/api/v1",
-            "chromInfoServer": "http://higlass.io/api/v1",
-            "visible": false,
-            "chromInfoId": "hg19",
-            "autocompleteId": "OHJakQICQD6gTD7skx4EWA"
-        }
         }
     ],
     "zoomLocks": {

@@ -1,0 +1,2 @@
+mkdir node_modules/higlass/dist
+cp higlass/higlass/dist/hglib.* node_modules/higlass/dist

@@ -545,35 +545,35 @@ export const tileDataToPixData = (
     return;
   }
 
-  // if (
-  //   tile.mirrored &&
-  //   // Data is already copied over
-  //   !tile.isMirrored &&
-  //   tile.tileData.tilePos.length > 0 &&
-  //   tile.tileData.tilePos[0] === tile.tileData.tilePos[1]
-  // ) {
-  //   // Copy the data before mutating it in case the same data is used elsewhere.
-  //   // During throttling/debouncing tile requests we also merge the requests so
-  //   // the very same tile data might be used by different tracks.
-  //   tile.tileData.dense = tile.tileData.dense.slice();
+  if (
+    tile.mirrored &&
+    // Data is already copied over
+    !tile.isMirrored &&
+    tile.tileData.tilePos.length > 0 &&
+    tile.tileData.tilePos[0] === tile.tileData.tilePos[1]
+  ) {
+    // Copy the data before mutating it in case the same data is used elsewhere.
+    // During throttling/debouncing tile requests we also merge the requests so
+    // the very same tile data might be used by different tracks.
+    tile.tileData.dense = tile.tileData.dense.slice();
 
-  //   // if a center tile is mirrored, we'll just add its transpose
-  //   const tileWidth = Math.floor(Math.sqrt(tile.tileData.dense.length));
-  //   for (let row = 0; row < tileWidth; row++) {
-  //     for (let col = row + 1; col < tileWidth; col++) {
-  //       tile.tileData.dense[row * tileWidth + col] =
-  //         tile.tileData.dense[col * tileWidth + row];
-  //     }
-  //   }
-  //   if (ignoreLowerLeft) {
-  //     for (let row = 0; row < tileWidth; row++) {
-  //       for (let col = 0; col < row; col++) {
-  //         tile.tileData.dense[row * tileWidth + col] = NaN;
-  //       }
-  //     }
-  //   }
-  //   tile.isMirrored = true;
-  // }
+    // if a center tile is mirrored, we'll just add its transpose
+    const tileWidth = Math.floor(Math.sqrt(tile.tileData.dense.length));
+    for (let row = 0; row < tileWidth; row++) {
+      for (let col = row + 1; col < tileWidth; col++) {
+        tile.tileData.dense[row * tileWidth + col] =
+          tile.tileData.dense[col * tileWidth + row];
+      }
+    }
+    if (ignoreLowerLeft) {
+      for (let row = 0; row < tileWidth; row++) {
+        for (let col = 0; col < row; col++) {
+          tile.tileData.dense[row * tileWidth + col] = NaN;
+        }
+      }
+    }
+    tile.isMirrored = true;
+  }
 
   // console.log('tile', tile);
   // clone the tileData so that the original array doesn't get neutered
